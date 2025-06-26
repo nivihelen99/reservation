@@ -4,14 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Server Reservation System</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Flatpickr CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <!-- Bootswatch Darkly Theme CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootswatch@4.5.2/dist/darkly/bootstrap.min.css" rel="stylesheet">
+    <!-- Flatpickr CSS (Dark Theme) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
     <style>
         body { padding-top: 20px; }
         .container { max-width: 800px; }
-        /* #reservationsTable th, #reservationsTable td { text-align: left; } */ /* Bootstrap default is usually sufficient */
+        /* Minor adjustments for Darkly if needed */
+        /* Example: Ensure alerts have good contrast if default Darkly alerts are not ideal */
+        .alert-success {
+            /* background-color: #28a745; Darkly might handle this well */
+            /* color: #fff; */
+        }
+        .alert-danger {
+            /* background-color: #dc3545; */
+            /* color: #fff; */
+        }
+        .alert-warning {
+             /* background-color: #ffc107; */
+             /* color: #212529; */
+        }
     </style>
 </head>
 <body>
@@ -102,6 +115,7 @@
                 dateFormat: "Y-m-d",
                 minDate: today,
                 maxDate: maxDate,
+                // theme: "dark" // This is for flatpickr's own themes, covered by separate dark.css
             });
 
             const timePickerConfig = {
@@ -110,13 +124,19 @@
                 dateFormat: "H:i",
                 time_24hr: true,
                 minuteIncrement: 15
+                // theme: "dark"
             };
             flatpickr("#start_time_picker", timePickerConfig);
             flatpickr("#end_time_picker", timePickerConfig);
 
             // Function to display messages
-            function showMessage(message, type = 'danger') {
-                messagesDiv.html(`<div class="alert alert-${type}" role="alert">${message}</div>`);
+            function showMessage(message, type = 'danger') { // Default type danger for errors
+                // Bootswatch themes usually style alerts well. If not, custom styles can be added.
+                let alertClass = 'alert-danger'; // Default to danger
+                if (type === 'success') alertClass = 'alert-success';
+                if (type === 'warning') alertClass = 'alert-warning';
+
+                messagesDiv.html(`<div class="alert ${alertClass}" role="alert">${message}</div>`);
                 setTimeout(() => messagesDiv.html(''), 5000); // Clear message after 5 seconds
             }
 
@@ -169,12 +189,10 @@
                 const startDateTimeStr = `${date} ${startTime}`;
                 const endDateTimeStr = `${date} ${endTime}`;
 
-                // Validate time order client-side (basic check)
                 if (moment(endDateTimeStr, "YYYY-MM-DD HH:mm") <= moment(startDateTimeStr, "YYYY-MM-DD HH:mm")) {
                     showMessage("End time must be after start time.", "warning");
                     return;
                 }
-
 
                 try {
                     const response = await $.ajax({
@@ -183,16 +201,16 @@
                         contentType: 'application/json',
                         data: JSON.stringify({
                             username: username,
-                            start_time: startDateTimeStr, // Send as naive string, backend will localize to PST
-                            end_time: endDateTimeStr    // Send as naive string, backend will localize to PST
+                            start_time: startDateTimeStr,
+                            end_time: endDateTimeStr
                         })
                     });
                     showMessage('Reservation successful!', 'success');
-                    $('#reservationForm')[0].reset(); // Reset form
-                    flatpickr("#reservation_date", {minDate: today, maxDate: maxDate}).clear(); // Clear flatpickr instances
+                    $('#reservationForm')[0].reset();
+                    flatpickr("#reservation_date", {minDate: today, maxDate: maxDate}).clear();
                     flatpickr("#start_time_picker", timePickerConfig).clear();
                     flatpickr("#end_time_picker", timePickerConfig).clear();
-                    fetchReservations(currentFilter); // Refresh list
+                    fetchReservations(currentFilter);
                 } catch (error) {
                     const errorMsg = error.responseJSON ? error.responseJSON.error : "An unknown error occurred.";
                     showMessage(errorMsg, 'danger');
@@ -201,7 +219,7 @@
 
             // Filter buttons
             $('#filterAll, #filterDay, #filterWeek').on('click', function() {
-                $('.btn-group .btn').removeClass('active');
+                $('.btn-group .btn').removeClass('active'); // Assuming Bootstrap 4, 'active' class for buttons
                 $(this).addClass('active');
                 const filterId = $(this).attr('id');
                 if (filterId === 'filterDay') currentFilter = 'day';
