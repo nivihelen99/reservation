@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server Reservation System</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Flatpickr CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <style>
+        body { padding-top: 20px; }
+        .container { max-width: 800px; }
+        /* #reservationsTable th, #reservationsTable td { text-align: left; } */ /* Bootstrap default is usually sufficient */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4 text-center">Reserve Server Time</h1>
+
+        <div id="messages">
+            <!-- Error/Success messages will be displayed here -->
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Make a Reservation</h5>
+                <form id="reservationForm">
+                    <div class="form-group">
+                        <label for="username">Name:</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="reservation_date">Date:</label>
+                        <input type="text" class="form-control" id="reservation_date" name="reservation_date" placeholder="Select Date" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group col-md-6">
+                            <label for="start_time">Start Time (PST):</label>
+                            <input type="text" class="form-control" id="start_time_picker" name="start_time_picker" placeholder="Select Start Time" required>
+                        </div>
+                        <div class="form-group col-md-6">
+                            <label for="end_time">End Time (PST):</label>
+                            <input type="text" class="form-control" id="end_time_picker" name="end_time_picker" placeholder="Select End Time" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Reserve</button>
+                </form>
+            </div>
+        </div>
+
+        <h2 class="mt-5 mb-3">Upcoming Reservations</h2>
+        <div class="btn-group mb-3" role="group" aria-label="Filter reservations">
+            <button type="button" class="btn btn-secondary active" id="filterAll">All Future</button>
+            <button type="button" class="btn btn-secondary" id="filterDay">Today</button>
+            <button type="button" class="btn btn-secondary" id="filterWeek">This Week</button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-striped" id="reservationsTable">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Start Time (PST)</th>
+                        <th>End Time (PST)</th>
+                    </tr>
+                </thead>
+                <tbody id="reservationsList">
+                    <!-- Reservations will be listed here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- jQuery and Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <!-- Flatpickr JS -->
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <!-- Moment.js for date/time manipulation and formatting (optional, but helpful) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment-timezone/0.5.34/moment-timezone-with-data.min.js"></script>
+
+
+    <script>
+        // Set default timezone for moment.js
+        moment.tz.setDefault("America/Los_Angeles");
+
+        $(document).ready(function() {
+            const API_URL = '/reservations';
+            const messagesDiv = $('#messages');
+            const reservationsList = $('#reservationsList');
+            let currentFilter = 'all'; // 'all', 'day', 'week'
+
+            // Initialize Flatpickr for date and time pickers
+            const today = moment().format("YYYY-MM-DD");
+            const maxDate = moment().add(30, 'days').format("YYYY-MM-DD");
+
+            flatpickr("#reservation_date", {
+                altInput: true,
+                altFormat: "F j, Y",
+                dateFormat: "Y-m-d",
+                minDate: today,
+                maxDate: maxDate,
+            });
+
+            const timePickerConfig = {
+                enableTime: true,
+                noCalendar: true,
+                dateFormat: "H:i",
+                time_24hr: true,
+                minuteIncrement: 15
+            };
+            flatpickr("#start_time_picker", timePickerConfig);
+            flatpickr("#end_time_picker", timePickerConfig);
+
+            // Function to display messages
+            function showMessage(message, type = 'danger') {
+                messagesDiv.html(`<div class="alert alert-${type}" role="alert">${message}</div>`);
+                setTimeout(() => messagesDiv.html(''), 5000); // Clear message after 5 seconds
+            }
+
+            // Function to fetch and display reservations
+            async function fetchReservations(filter = 'all') {
+                try {
+                    const response = await $.ajax({
+                        url: API_URL + `?view=${filter}`,
+                        method: 'GET'
+                    });
+                    reservationsList.empty();
+                    if (response.length === 0) {
+                        reservationsList.append('<tr><td colspan="3" class="text-center">No reservations found.</td></tr>');
+                    } else {
+                        response.forEach(res => {
+                            // Format times using moment-timezone to ensure PST display
+                            const startTimePST = moment(res.start_time).tz("America/Los_Angeles").format('YYYY-MM-DD HH:mm');
+                            const endTimePST = moment(res.end_time).tz("America/Los_Angeles").format('YYYY-MM-DD HH:mm');
+                            reservationsList.append(
+                                `<tr>
+                                    <td>${res.username}</td>
+                                    <td>${startTimePST}</td>
+                                    <td>${endTimePST}</td>
+                                </tr>`
+                            );
+                        });
+                    }
+                } catch (error) {
+                    const errorMsg = error.responseJSON ? error.responseJSON.error : "Error fetching reservations.";
+                    showMessage(errorMsg, 'danger');
+                    reservationsList.append('<tr><td colspan="3" class="text-center">Error loading reservations.</td></tr>');
+                }
+            }
+
+            // Handle reservation form submission
+            $('#reservationForm').on('submit', async function(e) {
+                e.preventDefault();
+                messagesDiv.html(''); // Clear previous messages
+
+                const username = $('#username').val();
+                const date = $('#reservation_date').val();
+                const startTime = $('#start_time_picker').val();
+                const endTime = $('#end_time_picker').val();
+
+                if (!username || !date || !startTime || !endTime) {
+                    showMessage('All fields are required.', 'warning');
+                    return;
+                }
+
+                const startDateTimeStr = `${date} ${startTime}`;
+                const endDateTimeStr = `${date} ${endTime}`;
+
+                // Validate time order client-side (basic check)
+                if (moment(endDateTimeStr, "YYYY-MM-DD HH:mm") <= moment(startDateTimeStr, "YYYY-MM-DD HH:mm")) {
+                    showMessage("End time must be after start time.", "warning");
+                    return;
+                }
+
+
+                try {
+                    const response = await $.ajax({
+                        url: API_URL,
+                        method: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({
+                            username: username,
+                            start_time: startDateTimeStr, // Send as naive string, backend will localize to PST
+                            end_time: endDateTimeStr    // Send as naive string, backend will localize to PST
+                        })
+                    });
+                    showMessage('Reservation successful!', 'success');
+                    $('#reservationForm')[0].reset(); // Reset form
+                    flatpickr("#reservation_date", {minDate: today, maxDate: maxDate}).clear(); // Clear flatpickr instances
+                    flatpickr("#start_time_picker", timePickerConfig).clear();
+                    flatpickr("#end_time_picker", timePickerConfig).clear();
+                    fetchReservations(currentFilter); // Refresh list
+                } catch (error) {
+                    const errorMsg = error.responseJSON ? error.responseJSON.error : "An unknown error occurred.";
+                    showMessage(errorMsg, 'danger');
+                }
+            });
+
+            // Filter buttons
+            $('#filterAll, #filterDay, #filterWeek').on('click', function() {
+                $('.btn-group .btn').removeClass('active');
+                $(this).addClass('active');
+                const filterId = $(this).attr('id');
+                if (filterId === 'filterDay') currentFilter = 'day';
+                else if (filterId === 'filterWeek') currentFilter = 'week';
+                else currentFilter = 'all';
+                fetchReservations(currentFilter);
+            });
+
+            // Initial load of reservations
+            fetchReservations(currentFilter);
+        });
+    </script>
+</body>
+</html>
